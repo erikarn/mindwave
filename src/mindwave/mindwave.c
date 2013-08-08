@@ -24,7 +24,7 @@ main(int argc, const char *argv[])
 {
 	int fd;
 	struct termios tio;
-	unsigned char buf[1];
+	unsigned char buf[8];
 	unsigned char payload[MAX_PAYLOAD];
 	int ret;
 	int plen;
@@ -38,7 +38,8 @@ main(int argc, const char *argv[])
 	}
 
 	memset(&tio, 0, sizeof(tio));
-	tio.c_iflag = tio.c_oflag = 0;
+	tio.c_iflag = 0;
+	tio.c_oflag = 0;
 	tio.c_cflag = CS8 | CREAD | CLOCAL;
 	tio.c_lflag = 0;
 	tio.c_cc[VMIN] = 1;
@@ -47,20 +48,38 @@ main(int argc, const char *argv[])
 	cfsetispeed(&tio, B115200);
 	cfsetospeed(&tio, B115200);
 
-	if (tcsetattr(fd, TCSANOW, &tio) < 0) {
-		err(1, "tcsetattr");
-	}
 	if (tcsetattr(fd, TCSAFLUSH, &tio) < 0) {
 		err(1, "tcsetattr");
 	}
 
-	sleep(3);
-
-#if 1
-	/* XX no idea what this does? */
-	buf[0] = 194;
+	/* Disconnect command */
+	sleep(1);
+	buf[0] = 0xc1;
 	if (write(fd, buf, 1) != 1)
 		printf("SHORT WRITE!\n");
+	if (tcdrain(fd) < 0)
+		err(1, "tcdrain");
+
+#if 1
+	/* Connect to headset 0x430e */
+	sleep(1);
+	buf[0] = 0xc0;
+	buf[1] = 0x43;
+	buf[2] = 0x0e;
+	if (write(fd, buf, 3) != 3)
+		printf("SHORT WRITE!\n");
+	if (tcdrain(fd) < 0)
+		err(1, "tcdrain");
+#endif
+
+#if 0
+	/* Search */
+	sleep(1);
+	buf[0] = 0xc2;
+	if (write(fd, buf, 1) != 1)
+		printf("SHORT WRITE!\n");
+	if (tcdrain(fd) < 0)
+		err(1, "tcdrain");
 #endif
 
 	while (1) {
