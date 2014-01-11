@@ -45,6 +45,7 @@ extern	int mindwave_run(struct mindwave_hdl *mw);
 extern	int mindwave_set_serial(struct mindwave_hdl *mw, const char *sport);
 extern	int mindwave_open(struct mindwave_hdl *mw);
 
+extern	int mindwave_send_disconnect(struct mindwave_hdl *mw);
 extern	int mindwave_connect_headset(struct mindwave_hdl *mw, uint16_t headset_id);
 extern	int mindwave_connect_headset_any(struct mindwave_hdl *mw);
 
