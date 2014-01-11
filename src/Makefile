@@ -1,6 +1,6 @@
 .include <bsd.own.mk>
 
-SUBDIR=	mindwave
+SUBDIR=	mindwave mindwave-sdl
 
 .include <bsd.subdir.mk>
 
