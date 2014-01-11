@@ -24,6 +24,20 @@ static const char * eeg_to_str[] = {
 	"mid-gamma",
 };
 
+static int
+comm_fd_set_nonblocking(int fd, int enable)
+{
+	int a;
+
+	a = fcntl(fd, F_GETFL, 0);
+	/* XXX check */
+	if (enable)
+		a |= O_NONBLOCK;
+	else
+		a &= ~O_NONBLOCK;
+	return (fcntl(fd, F_SETFL, a));
+}
+
 struct mindwave_hdl *
 mindwave_new(void)
 {
@@ -103,6 +117,9 @@ mindwave_open(struct mindwave_hdl *mw)
 		/* XXX error code! */
 		return (-1);
 	}
+
+	/* Make non-blocking */
+	(void) comm_fd_set_nonblocking(fd, 1);
 
 	mw->ms_fd = fd;
 	mw->ms_state = MS_IDLE;
