@@ -5,8 +5,9 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <string.h>
-#include <sys/types.h>
+#include <sys/errno.h>
 #include <sys/endian.h>
+#include <sys/types.h>
 
 #include "mindwave_hw.h"
 #include "mindwave.h"
@@ -127,6 +128,17 @@ mindwave_open(struct mindwave_hdl *mw)
 	return (0);
 }
 
+void
+mindwave_setup_cb(struct mindwave_hdl *mw, void *cbdata,
+    mw_attention_cb *ma, mw_meditation_cb *mm, mw_quality_cb *mq)
+{
+
+	mw->cb.cbdata = cbdata;
+	mw->cb.ma = ma;
+	mw->cb.mm = mm;
+	mw->cb.mq = mq;
+}
+
 /*
  * XXX for now just send the command, don't bother checking state
  * and such.
@@ -195,7 +207,7 @@ mindwave_calc_checksum(const uint8_t *buf, int len)
 }
 
 static int
-mindwave_parse_payload(const unsigned char *pbuf, int plen)
+mindwave_parse_payload(struct mindwave_hdl *mw, const unsigned char *pbuf, int plen)
 {
 	int i, j, p;
 	int len, code;
@@ -246,12 +258,18 @@ mindwave_parse_payload(const unsigned char *pbuf, int plen)
 		switch (code) {
 		case 2: /* Quality */
 			printf("Quality: %d\n", pbuf[p]);
+			if (mw->cb.mq)
+				mw->cb.mq(mw, mw->cb.cbdata, pbuf[p]);
 			break;
 		case 4: /* Attention */
 			printf("Attention: %d\n", pbuf[p]);
+			if (mw->cb.ma)
+				mw->cb.ma(mw, mw->cb.cbdata, pbuf[p]);
 			break;
 		case 5: /* Meditation */
 			printf("Meditation: %d\n", pbuf[p]);
+			if (mw->cb.mm)
+				mw->cb.mm(mw, mw->cb.cbdata, pbuf[p]);
 			break;
 		case 0x80:
 			/* 16-bit 2s complement signed; big endian */
@@ -395,7 +413,7 @@ mindwave_parse_buffer(struct mindwave_hdl *mw)
 	/* Check if they match! */
 	if (cksum == buf[3 + i + plen]) {
 		/* Match! Bump up to the parser */
-		mindwave_parse_payload(&buf[i+3], plen);
+		mindwave_parse_payload(mw, &buf[i+3], plen);
 	} else {
 		printf("CHECKSUM MISMATCH: cksum: %02x, calc cksum: %02x\n",
 		    buf[3 + i + plen] & 0xff,
@@ -433,6 +451,9 @@ mindwave_run(struct mindwave_hdl *mw)
 #endif
 
 	if (r < 0) {
+		if (errno == EINTR || errno == EWOULDBLOCK)
+			return (0);
+		warn("%s: read", __func__);
 		return (-1);
 	}
 

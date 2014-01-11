@@ -11,6 +11,12 @@ typedef enum {
 	MS_RUNNING
 } mindwave_state_t;
 
+struct mindwave_hdl;
+
+typedef void mw_attention_cb(struct mindwave_hdl *mw, void *cbdata, uint32_t attention);
+typedef void mw_meditation_cb(struct mindwave_hdl *mw, void *cbdata, uint32_t meditation);
+typedef void mw_quality_cb(struct mindwave_hdl *mw, void *cbdata, uint8_t quality);
+
 struct mindwave_hdl {
 	/* Serial port path */
 	char *ms_sport;
@@ -35,6 +41,12 @@ struct mindwave_hdl {
 	} read_buf;
 
 	/* Callbacks */
+	struct {
+		void *cbdata;
+		mw_attention_cb *ma;
+		mw_meditation_cb *mm;
+		mw_quality_cb *mq;
+	} cb;
 };
 
 extern	struct mindwave_hdl * mindwave_new(void);
@@ -48,5 +60,8 @@ extern	int mindwave_open(struct mindwave_hdl *mw);
 extern	int mindwave_send_disconnect(struct mindwave_hdl *mw);
 extern	int mindwave_connect_headset(struct mindwave_hdl *mw, uint16_t headset_id);
 extern	int mindwave_connect_headset_any(struct mindwave_hdl *mw);
+
+extern	void mindwave_setup_cb(struct mindwave_hdl *mw, void *cbdata,
+	    mw_attention_cb *ma, mw_meditation_cb *mm, mw_quality_cb *mq);
 
 #endif	/* __MINDWAVE_H__ */
