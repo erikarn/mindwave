@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/errno.h>
 #include <sys/endian.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 #include "mindwave_hw.h"
@@ -55,11 +56,28 @@ mindwave_new(void)
 	mw->read_buf.buf = malloc(mw->read_buf.len);
 	if (mw->read_buf.buf == NULL) {
 		warn("%s: malloc", __func__);
-		free(mw);
-		return (NULL);
+		goto err;
+	}
+
+	mw->raw_samples.len = 1024;
+	mw->raw_samples.offset = 0;
+	mw->raw_samples.cur_seq = 0;
+	mw->raw_samples.s = calloc(mw->raw_samples.len, sizeof(struct mindwave_raw_sample));
+
+	if (mw->raw_samples.s == NULL) {
+		warn("%s: calloc", __func__);
+		goto err;
 	}
 
 	return (mw);
+err:
+	if (mw->read_buf.buf)
+		free(mw->read_buf.buf);
+	if (mw->raw_samples.s)
+		free(mw->raw_samples.s);
+	if (mw)
+		free(mw);
+	return (NULL);
 }
 
 int
@@ -206,6 +224,21 @@ mindwave_calc_checksum(const uint8_t *buf, int len)
 	return (cksum);
 }
 
+static void
+mindwave_add_sample(struct mindwave_hdl *mw, int16_t sample)
+{
+
+	/* XXX does this even matter? Mean anything? Sigh. */
+	gettimeofday(&mw->raw_samples.s[mw->raw_samples.offset].tv, NULL);
+	mw->raw_samples.s[mw->raw_samples.offset].sample = sample;
+	mw->raw_samples.s[mw->raw_samples.offset].seqno =
+	    mw->raw_samples.cur_seq;
+
+	/* Bump sequence number and offset */
+	mw->raw_samples.cur_seq++;
+	mw->raw_samples.offset = (mw->raw_samples.offset + 1) % mw->raw_samples.len;
+}
+
 static int
 mindwave_parse_payload(struct mindwave_hdl *mw, const unsigned char *pbuf, int plen)
 {
@@ -273,8 +306,9 @@ mindwave_parse_payload(struct mindwave_hdl *mw, const unsigned char *pbuf, int p
 			break;
 		case 0x80:
 			/* 16-bit 2s complement signed; big endian */
-			rval = (pbuf[i+2]) | (pbuf[i+1] << 8);
-//			printf("RAW_WAVE: %d\n", rval);
+			rval = (pbuf[p+1]) | (pbuf[p+0] << 8);
+			mindwave_add_sample(mw, rval);
+//			printf("RAW_WAVE: %d (%02x %02x)\n", rval, pbuf[p+0] & 0xff, pbuf[p+1] & 0xff);
 			break;
 		case 0x83:
 			bzero(&eeg_power, sizeof(eeg_power));
@@ -400,7 +434,7 @@ mindwave_parse_buffer(struct mindwave_hdl *mw)
 	if (len < (plen + 4))
 		return (i);
 
-#if PKT_DEBUG
+#if 0 || PKT_DEBUG
 	/* Ok, let's dump out the buffer as-is, incl. start and crc */
 	printf("pkt start (ofs %d) (%d bytes):\n", i, plen);
 	print_payload(&buf[i], plen + 4);

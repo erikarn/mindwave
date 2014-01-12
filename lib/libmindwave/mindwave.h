@@ -13,9 +13,17 @@ typedef enum {
 
 struct mindwave_hdl;
 
+struct mindwave_raw_sample;
+
 typedef void mw_attention_cb(struct mindwave_hdl *mw, void *cbdata, uint32_t attention);
 typedef void mw_meditation_cb(struct mindwave_hdl *mw, void *cbdata, uint32_t meditation);
 typedef void mw_quality_cb(struct mindwave_hdl *mw, void *cbdata, uint8_t quality);
+
+struct mindwave_raw_sample {
+	struct timeval tv;
+	int16_t sample;
+	uint32_t seqno;
+};
 
 struct mindwave_hdl {
 	/* Serial port path */
@@ -39,6 +47,14 @@ struct mindwave_hdl {
 		int len;
 		int offset;
 	} read_buf;
+
+	/* Raw sampling data */
+	struct {
+		struct mindwave_raw_sample *s;
+		int len;
+		int offset;
+		uint32_t cur_seq;
+	} raw_samples;
 
 	/* Callbacks */
 	struct {
