@@ -21,6 +21,8 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
+#include <fftw3.h>
+
 #include "mindwave_hw.h"
 #include "mindwave.h"
 
@@ -31,6 +33,9 @@ struct mw_app {
 	int attention;
 	int meditation;
 	struct mindwave_hdl *mw;
+	fftw_complex *fft_in;
+	fftw_complex *fft_out;
+	fftw_plan fft_p;
 };
 
 /* SDL bits */
@@ -62,6 +67,40 @@ process_events(void)
 	}
 }
 
+static void
+update_fft_in(struct mw_app *app)
+{
+	int curofs;
+	int size;
+	int i;
+
+	curofs = app->mw->raw_samples.offset;
+	size = app->mw->raw_samples.len;
+
+	/*
+	 * Fill out the fft_in array with our current sample data.
+	 */
+	for (i = 0; i < size; i++) {
+		/* XXX do I normalise this? */
+		app->fft_in[i][0] =
+		     (float) app->mw->raw_samples.s[curofs].sample;
+
+#if 0
+		/* Clip? */
+		if (app->fft_in[i][0] > 512.0)
+			app->fft_in[i][0] = 512.0;
+		if (app->fft_in[i][0] < -512.0)
+			app->fft_in[i][0] = -512.0;
+#endif
+
+		app->fft_in[i][1] = 0.0;
+		curofs = (curofs + 1) % size;
+	}
+}
+
+/*
+ * Draw just the raw signal line - signal in the time domain.
+ */
 static void
 draw_signal_line(struct mw_app *app)
 {
@@ -103,6 +142,35 @@ draw_signal_line(struct mw_app *app)
 		if (curofs < 0)
 			curofs = size - 1;
 		glVertex3f(x * 2, y, 0);
+	}
+	glEnd();
+}
+
+/*
+ * Draw the FFT data out.
+ */
+static void
+draw_fft_data(struct mw_app *app)
+{
+	int size, i;
+	float x, y;
+
+	/*
+	 * Let's map the +ve FFT frequency domain point
+	 * space into our width (640 pixels.)
+	 *
+	 * Yes, some sub-pixel rendering will likely occur.
+	 */
+	glBegin(GL_LINE_STRIP);
+	glColor3f(0, 1, 1);
+	size = app->mw->raw_samples.len;
+	for (i = 0; i < size / 2; i++) {
+		/* XXX ignore complex? */
+		x = ((float) i * (float) 640 * (float) 2) / (float) size;
+		y = app->fft_out[i][0] / 128.0;
+		/* centre it on the midpoint */
+		y += 240;
+		glVertex3f(x, y, 0);
 	}
 	glEnd();
 }
@@ -169,6 +237,7 @@ draw_screen(struct mw_app *app)
     glEnd();
 
 	draw_signal_line(app);
+	draw_fft_data(app);
 
 	/* This waits for vertical refresh before flipping, so it sleeps */
 	SDL_GL_SwapBuffers();
@@ -275,6 +344,14 @@ main(int argc, const char *argv[])
 	/* Setup callbacks */
 	mindwave_setup_cb(app.mw, &app, mw_app_attention_cb, mw_app_meditation_cb, mw_app_quality_cb);
 
+	/*
+	 * Now we've set it up, let's fetch the sample size
+	 * and setup the fft plan.
+	 */
+	app.fft_in = fftw_malloc(sizeof(fftw_complex) * app.mw->raw_samples.len);
+	app.fft_out = fftw_malloc(sizeof(fftw_complex) * app.mw->raw_samples.len);
+	app.fft_p = fftw_plan_dft_1d(app.mw->raw_samples.len, app.fft_in, app.fft_out, FFTW_FORWARD, FFTW_ESTIMATE);
+
 	if (mindwave_open(app.mw) != 0)
 		err(1, "mindwave_open");
 
@@ -299,6 +376,13 @@ main(int argc, const char *argv[])
 		mw_poll_check(app.mw);
 		/* Process incoming events. */
 		process_events();
+
+		/* Update incoming FFT */
+		update_fft_in(&app);
+
+		/* Run FFT */
+		fftw_execute(app.fft_p);
+
 		/* Draw the screen. */
 		draw_screen(&app);
 	}
