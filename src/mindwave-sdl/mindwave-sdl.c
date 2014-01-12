@@ -72,6 +72,13 @@ draw_screen(struct mw_app *app)
      */
 
     /* Quality */
+    glBegin(GL_QUADS);
+     glColor3f(1, 0, 0);
+     glVertex3f(0, 480, 0);
+     glVertex3f(50, 480, 0);
+     glVertex3f(50, 480 - app->quality, 0);
+     glVertex3f(0, 480 - app->quality, 0);
+    glEnd();
     glBegin(GL_LINE_STRIP);
      glColor3f(1, 1, 1);
      glVertex3f(0, 480, 0);
@@ -81,24 +88,7 @@ draw_screen(struct mw_app *app)
      glVertex3f(0, 480, 0);
     glEnd();
 
-    glBegin(GL_QUADS);
-     glColor3f(1, 0, 0);
-     glVertex3f(0, 480, 0);
-     glVertex3f(50, 480, 0);
-     glVertex3f(50, 480 - app->quality, 0);
-     glVertex3f(0, 480 - app->quality, 0);
-    glEnd();
-
     /* Meditation */
-    glBegin(GL_LINE_STRIP);
-     glColor3f(1, 1, 1);
-     glVertex3f(100, 480, 0);
-     glVertex3f(150, 480, 0);
-     glVertex3f(150, 480 - 200, 0);
-     glVertex3f(100, 480 - 200, 0);
-     glVertex3f(100, 480, 0);
-    glEnd();
-
     glBegin(GL_QUADS);
      glColor3f(0, 1, 0);
      glVertex3f(100, 480, 0);
@@ -106,17 +96,16 @@ draw_screen(struct mw_app *app)
      glVertex3f(150, 480 - app->meditation, 0);
      glVertex3f(100, 480 - app->meditation, 0);
     glEnd();
-
-    /* Attention */
     glBegin(GL_LINE_STRIP);
      glColor3f(1, 1, 1);
-     glVertex3f(200, 480, 0);
-     glVertex3f(250, 480, 0);
-     glVertex3f(250, 480 - 200, 0);
-     glVertex3f(200, 480 - 200, 0);
-     glVertex3f(200, 480, 0);
+     glVertex3f(100, 480, 0);
+     glVertex3f(150, 480, 0);
+     glVertex3f(150, 480 - 100, 0);
+     glVertex3f(100, 480 - 100, 0);
+     glVertex3f(100, 480, 0);
     glEnd();
 
+    /* Attention */
     glBegin(GL_QUADS);
      glColor3f(0, 0, 1);
      glVertex3f(200, 480, 0);
@@ -124,19 +113,16 @@ draw_screen(struct mw_app *app)
      glVertex3f(250, 480 - app->attention, 0);
      glVertex3f(200, 480 - app->attention, 0);
     glEnd();
-
-
-
-
-#if 0
     glBegin(GL_LINE_STRIP);
-        glColor3f(1, 0, 0); glVertex3f(1, 1, 0);
-        glColor3f(1, 1, 0); glVertex3f(100, 1, 0);
-        glColor3f(1, 0, 1); glVertex3f(100, 100, 0);
-        glColor3f(1, 1, 1); glVertex3f(1, 100, 0);
+     glColor3f(1, 1, 1);
+     glVertex3f(200, 480, 0);
+     glVertex3f(250, 480, 0);
+     glVertex3f(250, 480 - 100, 0);
+     glVertex3f(200, 480 - 100, 0);
+     glVertex3f(200, 480, 0);
     glEnd();
-#endif
- 
+
+    /* This waits for vertical refresh before flipping, so it sleeps */
     SDL_GL_SwapBuffers();
 }
 
