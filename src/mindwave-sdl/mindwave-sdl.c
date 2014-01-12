@@ -30,6 +30,7 @@ struct mw_app {
 	int quality;
 	int attention;
 	int meditation;
+	struct mindwave_hdl *mw;
 };
 
 /* SDL bits */
@@ -59,6 +60,51 @@ process_events(void)
 			break;
 		}
 	}
+}
+
+static void
+draw_signal_line(struct mw_app *app)
+{
+	int x, y;
+	int curofs;
+	int size;
+
+	/*
+	 * Plot a line series for the last 320 elements,
+	 * two pixel wide (640 pixels.)
+	 */
+	curofs = app->mw->raw_samples.offset - 1;
+	size = app->mw->raw_samples.len;
+	if (curofs < 0)
+		curofs = size - 1;
+
+	glBegin(GL_LINE_STRIP);
+	glColor3f(1, 1, 0);
+	for (x = 0; x < 320; x++) {
+		/*
+		 * Y axis is 480 high, so let's split it into
+		 * +/- 240.  The dynamic range of the raw
+		 * values is signed 16-bit value, so scale that.
+		 */
+		y = app->mw->raw_samples.s[curofs].sample;
+		y = y * 240 / 1024;
+
+		/* Clip */
+		if (y < -240)
+			y = -240;
+		else if (y > 240)
+			y = 240;
+
+		/* Set offset to middle of the screen */
+		y += 240;
+
+		/* Go backwards in samples */
+		curofs--;
+		if (curofs < 0)
+			curofs = size - 1;
+		glVertex3f(x * 2, y, 0);
+	}
+	glEnd();
 }
 
 static void
@@ -122,8 +168,10 @@ draw_screen(struct mw_app *app)
      glVertex3f(200, 480, 0);
     glEnd();
 
-    /* This waits for vertical refresh before flipping, so it sleeps */
-    SDL_GL_SwapBuffers();
+	draw_signal_line(app);
+
+	/* This waits for vertical refresh before flipping, so it sleeps */
+	SDL_GL_SwapBuffers();
 }
 
 static int
@@ -211,34 +259,33 @@ mw_poll_check(struct mindwave_hdl *mw)
 int
 main(int argc, const char *argv[])
 {
-	struct mindwave_hdl *mw;
 	struct mw_app app;
 	struct pollfd pollfds[2];
 	int r, n;
 
 	bzero(&app, sizeof(app));
 
-	mw = mindwave_new();
-	if (mw == NULL)
+	app.mw = mindwave_new();
+	if (app.mw == NULL)
 		err(1, "mindwave_new");
 
-	if (mindwave_set_serial(mw, SER_PORT) != 0)
+	if (mindwave_set_serial(app.mw, SER_PORT) != 0)
 		err(1, "mindwave_set_serial");
 
 	/* Setup callbacks */
-	mindwave_setup_cb(mw, &app, mw_app_attention_cb, mw_app_meditation_cb, mw_app_quality_cb);
+	mindwave_setup_cb(app.mw, &app, mw_app_attention_cb, mw_app_meditation_cb, mw_app_quality_cb);
 
-	if (mindwave_open(mw) != 0)
+	if (mindwave_open(app.mw) != 0)
 		err(1, "mindwave_open");
 
 	/* Disconnect from any existing headset */
 	sleep(1);
-	if (mindwave_send_disconnect(mw) < 0)
+	if (mindwave_send_disconnect(app.mw) < 0)
 		err(1, "mindwave_disconnect");
 
 	/* Connect to a specific headset */
 	sleep(1);
-	if (mindwave_connect_headset(mw, 0x871f) < 0)
+	if (mindwave_connect_headset(app.mw, 0x871f) < 0)
 		err(1, "mindwave_connect_headset");
 
 	if (scr_init() == 0)
@@ -249,7 +296,7 @@ main(int argc, const char *argv[])
 	 */
 	while (1) {
 		/* Run mindwave IO loop if needed */
-		mw_poll_check(mw);
+		mw_poll_check(app.mw);
 		/* Process incoming events. */
 		process_events();
 		/* Draw the screen. */
